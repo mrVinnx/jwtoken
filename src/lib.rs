@@ -1,0 +1,261 @@
+//! A simple Rust utility library for encoding and decoding JSON Web Tokens (JWT).
+//!
+//! This crate provides a simple API for creating, signing, and verifying JWTs with support for HMAC-SHA256 (HS256).
+//!
+//! # Example
+//!
+//! ```rust
+//! use jwtoken::{HS256, Jwt, Builder, Decoded};
+//!
+//! fn main() -> Result<(), jwtoken::JwtError> {
+//!     let secret = b"your-secret-key";
+//!     let algorithm = HS256::new(secret);
+//!
+//!     // Encoding a JWT
+//!     let token = Jwt::<Builder>::new()
+//!         .claim("sub", "1234567890")
+//!         .claim("name", "John Doe")
+//!         .claim("iat", 1516239022)
+//!         .encode(&algorithm)?;
+//!
+//!     println!("Generated token: {}", token);
+//!
+//!     // Decoding and verifying the same JWT
+//!     let decoded = Jwt::<Decoded>::decode(&token, &algorithm)?;
+//!     println!("Decoded claims: {:?}", decoded.claims);
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+
+mod alg;
+mod error;
+
+pub use alg::*;
+pub use error::*;
+
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use serde::Serialize;
+use serde_json::{Map, Value};
+
+/// A builder for creating and encoding JWTs.
+///
+/// Use this to construct a JWT with custom headers and claims.
+#[derive(Debug, Clone)]
+pub struct Builder;
+
+/// A decoded JWT, containing the headers and claims.
+///
+/// Use this to inspect the contents of a verified JWT.
+#[derive(Debug, Clone)]
+pub struct Decoded;
+
+/// A JSON Web Token (JWT) in a specific state (either `Builder` or `Decoded`).
+///
+/// This type is generic over its state, allowing for type-safe construction and decoding.
+#[derive(Debug, Clone)]
+pub struct Jwt<State> {
+    pub headers: Headers,
+    pub claims: Claims,
+    _state: std::marker::PhantomData<State>,
+}
+
+pub type Claims = Map<String, Value>;
+pub type Headers = Map<String, Value>;
+
+impl Jwt<Builder> {
+    /// Creates a new JWT builder with default headers.
+    ///
+    /// The default headers include `typ: "JWT"`.
+    pub fn new() -> Self {
+        let mut headers = Map::new();
+        headers.insert("typ".to_string(), Value::String("JWT".to_string()));
+
+        Self {
+            headers,
+            claims: Map::new(),
+            _state: std::marker::PhantomData,
+        }
+    }
+
+    /// Sets the signing algorithm for the JWT.
+    ///
+    /// # Arguments
+    /// * `alg` - The algorithm to use for signing (e.g., `HS256`).
+    pub fn algorithm<A: Algorithm>(mut self, alg: &A) -> Self {
+        self.headers
+            .insert("alg".to_string(), Value::String(alg.name().to_string()));
+        self
+    }
+
+    /// Adds a claim to the JWT.
+    ///
+    /// # Arguments
+    /// * `key` - The claim key (e.g., "sub").
+    /// * `value` - The claim value, which must implement `Serialize`.
+    pub fn claim<V: Serialize>(mut self, key: &str, value: V) -> Self {
+        if let Ok(value) = serde_json::to_value(value) {
+            self.claims.insert(key.to_string(), value);
+        }
+        self
+    }
+
+    /// Adds a claim to the JWT using a pre-serialized JSON value.
+    ///
+    /// # Arguments
+    /// * `key` - The claim key (e.g., "sub").
+    /// * `value` - The claim value, which must implement `Into<Value>`.
+    pub fn claim_json<V: Into<Value>>(mut self, key: &str, value: V) -> Self {
+        self.claims.insert(key.to_string(), value.into());
+        self
+    }
+
+    /// Encodes the JWT into a string using the specified algorithm.
+    ///
+    /// # Arguments
+    /// * `alg` - The algorithm to use for signing.
+    ///
+    /// # Errors
+    /// Returns `JwtError` if serialization or signing fails.
+    pub fn encode<A: Algorithm>(mut self, alg: &A) -> Result<String, JwtError> {
+        self.headers
+            .insert("alg".to_string(), Value::String(alg.name().to_string()));
+
+        let header_json =
+            serde_json::to_string(&self.headers).map_err(|_| JwtError::SerializationError)?;
+        let claims_json =
+            serde_json::to_string(&self.claims).map_err(|_| JwtError::SerializationError)?;
+
+        let header_b64 = URL_SAFE_NO_PAD.encode(header_json.as_bytes());
+        let claims_b64 = URL_SAFE_NO_PAD.encode(claims_json.as_bytes());
+
+        let signing_input = format!("{}.{}", header_b64, claims_b64);
+
+        let signature = alg.sign(signing_input.as_bytes())?;
+        let signature_b64 = URL_SAFE_NO_PAD.encode(&signature);
+
+        Ok(format!("{}.{}.{}", header_b64, claims_b64, signature_b64))
+    }
+}
+
+impl Jwt<Decoded> {
+    /// Decodes and verifies a JWT string.
+    ///
+    /// # Arguments
+    /// * `token` - The JWT string to decode.
+    /// * `algorithm` - The algorithm to use for verification.
+    ///
+    /// # Errors
+    /// Returns `JwtError` if the token is invalid or verification fails.
+    pub fn decode<A: Algorithm>(token: &str, algorithm: &A) -> Result<Jwt<Decoded>, JwtError> {
+        let parts: Vec<&str> = token.split('.').collect();
+        if parts.len() != 3 {
+            return Err(JwtError::InvalidFormat);
+        }
+
+        let header_bytes = URL_SAFE_NO_PAD
+            .decode(parts[0])
+            .map_err(|_| JwtError::InvalidFormat)?;
+        let claims_bytes = URL_SAFE_NO_PAD
+            .decode(parts[1])
+            .map_err(|_| JwtError::InvalidFormat)?;
+        let signature = URL_SAFE_NO_PAD
+            .decode(parts[2])
+            .map_err(|_| JwtError::InvalidFormat)?;
+
+        let headers: Map<String, Value> =
+            serde_json::from_slice(&header_bytes).map_err(|_| JwtError::SerializationError)?;
+        let claims: Map<String, Value> =
+            serde_json::from_slice(&claims_bytes).map_err(|_| JwtError::SerializationError)?;
+
+        if let Some(Value::String(alg)) = headers.get("alg") {
+            if alg != algorithm.name() {
+                return Err(JwtError::InvalidAlgorithm);
+            }
+        } else {
+            return Err(JwtError::InvalidAlgorithm);
+        }
+
+        let signing_input = format!("{}.{}", parts[0], parts[1]);
+        if !algorithm.verify(signing_input.as_bytes(), &signature)? {
+            return Err(JwtError::InvalidSignature);
+        }
+
+        Ok(Jwt {
+            headers,
+            claims,
+            _state: std::marker::PhantomData,
+        })
+    }
+
+    /// Retrieves a header value by key.
+    ///
+    /// # Arguments
+    /// * `key` - The header key (e.g., "alg").
+    pub fn header(&self, key: &str) -> Option<&Value> {
+        self.headers.get(key)
+    }
+
+    /// Retrieves a claim value by key.
+    ///
+    /// # Arguments
+    /// * `key` - The claim key (e.g., "sub").
+    pub fn claim(&self, key: &str) -> Option<&Value> {
+        self.claims.get(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+
+    #[test]
+    fn test_hs256_encode_decode() {
+        let algorithm = HS256::new(&random_secret());
+
+        let jwt = Jwt::<Builder>::new()
+            .claim("sub", "1234567890")
+            .claim("name", "John Doe")
+            .claim("iat", 1516239022)
+            .claim_json("admin", Value::Bool(true));
+
+        let token = jwt.encode(&algorithm).unwrap();
+        println!("Token: {}", token);
+
+        let decoded = Jwt::<Decoded>::decode(&token, &algorithm).unwrap();
+        assert_eq!(
+            decoded.claim("sub"),
+            Some(&Value::String("1234567890".to_string()))
+        );
+        assert_eq!(
+            decoded.claim("name"),
+            Some(&Value::String("John Doe".to_string()))
+        );
+        assert_eq!(
+            decoded.claim("iat"),
+            Some(&Value::Number(1516239022.into()))
+        );
+        assert_eq!(decoded.claim("admin"), Some(&Value::Bool(true)));
+    }
+
+    #[test]
+    fn test_invalid_signature() {
+        let secret = b"256-bit-secret";
+        let wrong_secret = b"wrong-secret";
+
+        let algorithm = HS256::new(secret);
+        let wrong_algorithm = HS256::new(wrong_secret);
+
+        let jwt = Jwt::<Builder>::new()
+            .claim("sub", "1234567890")
+            .claim("name", "John Doe")
+            .claim("iat", 1516239022);
+
+        let token = jwt.encode(&algorithm).unwrap();
+
+        let result = Jwt::<Decoded>::decode(&token, &wrong_algorithm);
+        assert!(result.is_err())
+    }
+}

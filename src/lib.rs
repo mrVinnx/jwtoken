@@ -5,10 +5,10 @@
 //! # Example
 //!
 //! ```rust
-//! use jwtoken::{HS256, Jwt, Builder, Decoded};
+//! use jwtoken::{random_secret, HS256, Jwt, Builder, Decoded};
 //!
 //! fn main() -> Result<(), jwtoken::JwtError> {
-//!     let secret = b"your-secret-key";
+//!     let secret = random_secret();
 //!     let algorithm = HS256::new(secret);
 //!
 //!     // Encoding a JWT
@@ -38,6 +38,9 @@ pub use error::*;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::Serialize;
 use serde_json::{Map, Value};
+
+#[cfg(feature = "rnd")]
+use rand::{RngCore, rng};
 
 /// A builder for creating and encoding JWTs.
 ///
@@ -206,6 +209,16 @@ impl Jwt<Decoded> {
     }
 }
 
+/// Generates a random 256-bit secret for JWT signing.
+///
+/// This function is only available when the `rnd` feature is enabled.
+#[cfg(feature = "rnd")]
+pub fn random_secret() -> Vec<u8> {
+    let mut secret = [0u8; 32];
+    rng().fill_bytes(&mut secret);
+    URL_SAFE_NO_PAD.encode(&secret).into_bytes()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,7 +226,9 @@ mod tests {
 
     #[test]
     fn test_hs256_encode_decode() {
-        let algorithm = HS256::new(&random_secret());
+        #[cfg(feature = "rnd")]
+        let secret = random_secret();
+        let algorithm = HS256::new(&secret);
 
         let jwt = Jwt::<Builder>::new()
             .claim("sub", "1234567890")

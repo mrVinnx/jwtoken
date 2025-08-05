@@ -57,13 +57,3 @@ impl Algorithm for HS256 {
         Ok(expected == signature)
     }
 }
-
-/// Generates a random 256-bit secret for JWT signing.
-pub fn random_secret() -> Vec<u8> {
-    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-    use rand::{RngCore, rng};
-
-    let mut secret = [0u8; 32];
-    rng().fill_bytes(&mut secret);
-    URL_SAFE_NO_PAD.encode(&secret).into_bytes()
-}

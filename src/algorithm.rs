@@ -7,7 +7,7 @@ use crate::JwtError;
 
 /// Trait for JWT signing algorithms.
 pub trait Signer {
-    /// Returns the algorithm name (e.g., "HS256").
+    /// Returns the algorithm name.
     fn name(&self) -> &str;
 
     /// Signs a message and returns the signature.
@@ -16,7 +16,7 @@ pub trait Signer {
 
 /// Trait for JWT verification algorithms.
 pub trait Verifier {
-    /// Returns the algorithm name (e.g., "HS256").
+    /// Returns the algorithm name.
     fn name(&self) -> &str;
 
     /// Verifies a message against a signature.

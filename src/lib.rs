@@ -9,14 +9,14 @@
 //! ```rust
 //! # #[cfg(feature = "rnd")]
 //! # {
-//! use jwtoken::{random_secret, HS256, Jwt, Builder, Decoded};
+//! use jwtoken::{random_secret, HS256, Jwt, Encoder, Decoded};
 //!
 //! fn main() -> Result<(), jwtoken::JwtError> {
 //!     let secret = random_secret();
 //!     let algorithm = HS256::new(&secret);
 //!
 //!     // Encoding a JWT
-//!     let token = Jwt::<Builder>::new()
+//!     let token = Jwt::<Encoder>::new()
 //!         .claim("sub", "1234567890")
 //!         .claim("name", "John Doe")
 //!         .claim("iat", 1516239022)
@@ -47,21 +47,15 @@ use serde_json::{Map, Value};
 #[cfg(feature = "rnd")]
 use rand::{RngCore, rng};
 
-/// A builder for creating and encoding JWTs.
-///
-/// Use this to construct a JWT with custom headers and claims.
+/// A encoder state for creating JWTs.
 #[derive(Debug, Clone)]
-pub struct Builder;
+pub struct Encoder;
 
-/// A decoded JWT, containing the headers and claims.
-///
-/// Use this to inspect the contents of a verified JWT.
+/// A decoded state JWT to be inspected
 #[derive(Debug, Clone)]
 pub struct Decoded;
 
-/// A JSON Web Token (JWT) in a specific state (either `Builder` or `Decoded`).
-///
-/// This type is generic over its state, allowing for type-safe construction and decoding.
+/// A JSON Web Token (JWT) in a specific state (either `Encoder` or `Decoded`).
 #[derive(Debug, Clone)]
 pub struct Jwt<State> {
     pub headers: Headers,
@@ -72,7 +66,7 @@ pub struct Jwt<State> {
 pub type Claims = Map<String, Value>;
 pub type Headers = Map<String, Value>;
 
-impl Jwt<Builder> {
+impl Jwt<Encoder> {
     /// Creates a new JWT builder with default headers.
     pub fn new() -> Self {
         let mut headers = Map::new();
@@ -99,7 +93,7 @@ impl Jwt<Builder> {
         self
     }
 
-    /// Encodes the JWT into a string using the specified signer.
+    /// Encoders the JWT into a string using the specified signer.
     pub fn encode<S: Signer>(mut self, signer: &S) -> Result<String, JwtError> {
         self.headers
             .insert("alg".to_string(), Value::String(signer.name().to_string()));
@@ -121,7 +115,7 @@ impl Jwt<Builder> {
 }
 
 impl Jwt<Decoded> {
-    /// Decodes and verifies a JWT string using the specified verifier.
+    /// Decodeds and verifies a JWT string using the specified verifier.
     pub fn decode<V: Verifier>(token: &str, verifier: &V) -> Result<Jwt<Decoded>, JwtError> {
         let parts: Vec<&str> = token.split('.').collect();
         if parts.len() != 3 {
@@ -175,8 +169,6 @@ impl Jwt<Decoded> {
 }
 
 /// Generates a random 256-bit secret for JWT signing.
-///
-/// This function is only available when the `rnd` feature is enabled.
 #[cfg(feature = "rnd")]
 pub fn random_secret() -> Vec<u8> {
     let mut secret = [0u8; 32];
@@ -195,7 +187,7 @@ mod tests {
         let secret = random_secret();
         let algorithm = HS256::new(&secret);
 
-        let jwt = Jwt::<Builder>::new()
+        let jwt = Jwt::<Encoder>::new()
             .claim("sub", "1234567890")
             .claim("name", "John Doe")
             .claim("iat", 1516239022)
@@ -228,7 +220,7 @@ mod tests {
         let algorithm = HS256::new(secret);
         let wrong_algorithm = HS256::new(wrong_secret);
 
-        let jwt = Jwt::<Builder>::new()
+        let jwt = Jwt::<Encoder>::new()
             .claim("sub", "1234567890")
             .claim("name", "John Doe")
             .claim("iat", 1516239022);

@@ -22,14 +22,14 @@ jwtoken = { version = "0.1.0", features = ["rnd"] }
 HS256 uses a shared secret key for both signing and verification:
 
 ```rust
-use jwtoken::{random_secret, Jwt, Builder, Decoded, HS256};
+use jwtoken::{random_secret, Jwt, Encoder, Decoded, HS256};
 
 fn main() -> Result<(), jwtoken::JwtError> {
     let secret = random_secret();
     let algorithm = HS256::new(secret);
 
     // Encoding a JWT
-    let token = Jwt::<Builder>::new()
+    let token = Jwt::<Encoder>::new()
         .claim("sub", "1234567890")
         .claim("name", "John Doe")
         .claim("iat", 1516239022)
@@ -47,13 +47,13 @@ fn main() -> Result<(), jwtoken::JwtError> {
 
 ## API Reference
 
-### JWT Builder
+### JWT Encoder
 
 ```rust
-let jwt = Jwt::<Builder>::new()
-    .claim("key", "value")           // Add a claim
-    .claim_json("key", json_value)   // Add a Serializable value
-    .encode(&algorithm)?;            // Sign and encode to string
+let jwt = Jwt::<Encoder>::new()
+    .claim("key", "value")                              // Add a plain values
+    .claim_json("metadata", json!({ "role": "admin" })  // Add a JSON value
+    .encode(&algorithm)?;                               // Sign and encode to string
 ```
 
 ### JWT Decoder

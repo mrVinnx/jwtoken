@@ -1,15 +1,19 @@
-//! A simple Rust utility library for encoding and decoding JSON Web Tokens (JWT).
+//! A flexible utility library for encoding and decoding JSON Web Tokens (JWT).
 //!
-//! This crate provides a simple API for creating, signing, and verifying JWTs with support for HMAC-SHA256 (HS256).
+//! This crate provides a type state API for creating, signing, and verifying JWTs with support for HMAC-SHA256 (HS256).
 //!
-//! # Example
+//! # Examples
+//!
+//! ## Using HS256 (HMAC-SHA256)
 //!
 //! ```rust
+//! # #[cfg(feature = "rnd")]
+//! # {
 //! use jwtoken::{random_secret, HS256, Jwt, Builder, Decoded};
 //!
 //! fn main() -> Result<(), jwtoken::JwtError> {
 //!     let secret = random_secret();
-//!     let algorithm = HS256::new(secret);
+//!     let algorithm = HS256::new(&secret);
 //!
 //!     // Encoding a JWT
 //!     let token = Jwt::<Builder>::new()
@@ -26,13 +30,14 @@
 //!
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 
-mod alg;
+mod algorithm;
 mod error;
 
-pub use alg::*;
+pub use algorithm::*;
 pub use error::*;
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -69,8 +74,6 @@ pub type Headers = Map<String, Value>;
 
 impl Jwt<Builder> {
     /// Creates a new JWT builder with default headers.
-    ///
-    /// The default headers include `typ: "JWT"`.
     pub fn new() -> Self {
         let mut headers = Map::new();
         headers.insert("typ".to_string(), Value::String("JWT".to_string()));
@@ -82,21 +85,7 @@ impl Jwt<Builder> {
         }
     }
 
-    /// Sets the signing algorithm for the JWT.
-    ///
-    /// # Arguments
-    /// * `alg` - The algorithm to use for signing (e.g., `HS256`).
-    pub fn algorithm<A: Algorithm>(mut self, alg: &A) -> Self {
-        self.headers
-            .insert("alg".to_string(), Value::String(alg.name().to_string()));
-        self
-    }
-
     /// Adds a claim to the JWT.
-    ///
-    /// # Arguments
-    /// * `key` - The claim key (e.g., "sub").
-    /// * `value` - The claim value, which must implement `Serialize`.
     pub fn claim<V: Serialize>(mut self, key: &str, value: V) -> Self {
         if let Ok(value) = serde_json::to_value(value) {
             self.claims.insert(key.to_string(), value);
@@ -105,25 +94,15 @@ impl Jwt<Builder> {
     }
 
     /// Adds a claim to the JWT using a pre-serialized JSON value.
-    ///
-    /// # Arguments
-    /// * `key` - The claim key (e.g., "sub").
-    /// * `value` - The claim value, which must implement `Into<Value>`.
     pub fn claim_json<V: Into<Value>>(mut self, key: &str, value: V) -> Self {
         self.claims.insert(key.to_string(), value.into());
         self
     }
 
-    /// Encodes the JWT into a string using the specified algorithm.
-    ///
-    /// # Arguments
-    /// * `alg` - The algorithm to use for signing.
-    ///
-    /// # Errors
-    /// Returns `JwtError` if serialization or signing fails.
-    pub fn encode<A: Algorithm>(mut self, alg: &A) -> Result<String, JwtError> {
+    /// Encodes the JWT into a string using the specified signer.
+    pub fn encode<S: Signer>(mut self, signer: &S) -> Result<String, JwtError> {
         self.headers
-            .insert("alg".to_string(), Value::String(alg.name().to_string()));
+            .insert("alg".to_string(), Value::String(signer.name().to_string()));
 
         let header_json =
             serde_json::to_string(&self.headers).map_err(|_| JwtError::SerializationError)?;
@@ -132,10 +111,9 @@ impl Jwt<Builder> {
 
         let header_b64 = URL_SAFE_NO_PAD.encode(header_json.as_bytes());
         let claims_b64 = URL_SAFE_NO_PAD.encode(claims_json.as_bytes());
-
         let signing_input = format!("{}.{}", header_b64, claims_b64);
 
-        let signature = alg.sign(signing_input.as_bytes())?;
+        let signature = signer.sign(signing_input.as_bytes())?;
         let signature_b64 = URL_SAFE_NO_PAD.encode(&signature);
 
         Ok(format!("{}.{}.{}", header_b64, claims_b64, signature_b64))
@@ -143,15 +121,8 @@ impl Jwt<Builder> {
 }
 
 impl Jwt<Decoded> {
-    /// Decodes and verifies a JWT string.
-    ///
-    /// # Arguments
-    /// * `token` - The JWT string to decode.
-    /// * `algorithm` - The algorithm to use for verification.
-    ///
-    /// # Errors
-    /// Returns `JwtError` if the token is invalid or verification fails.
-    pub fn decode<A: Algorithm>(token: &str, algorithm: &A) -> Result<Jwt<Decoded>, JwtError> {
+    /// Decodes and verifies a JWT string using the specified verifier.
+    pub fn decode<V: Verifier>(token: &str, verifier: &V) -> Result<Jwt<Decoded>, JwtError> {
         let parts: Vec<&str> = token.split('.').collect();
         if parts.len() != 3 {
             return Err(JwtError::InvalidFormat);
@@ -173,7 +144,7 @@ impl Jwt<Decoded> {
             serde_json::from_slice(&claims_bytes).map_err(|_| JwtError::SerializationError)?;
 
         if let Some(Value::String(alg)) = headers.get("alg") {
-            if alg != algorithm.name() {
+            if alg != verifier.name() {
                 return Err(JwtError::InvalidAlgorithm);
             }
         } else {
@@ -181,7 +152,7 @@ impl Jwt<Decoded> {
         }
 
         let signing_input = format!("{}.{}", parts[0], parts[1]);
-        if !algorithm.verify(signing_input.as_bytes(), &signature)? {
+        if !verifier.verify(signing_input.as_bytes(), &signature)? {
             return Err(JwtError::InvalidSignature);
         }
 
@@ -193,17 +164,11 @@ impl Jwt<Decoded> {
     }
 
     /// Retrieves a header value by key.
-    ///
-    /// # Arguments
-    /// * `key` - The header key (e.g., "alg").
     pub fn header(&self, key: &str) -> Option<&Value> {
         self.headers.get(key)
     }
 
     /// Retrieves a claim value by key.
-    ///
-    /// # Arguments
-    /// * `key` - The claim key (e.g., "sub").
     pub fn claim(&self, key: &str) -> Option<&Value> {
         self.claims.get(key)
     }
@@ -225,8 +190,8 @@ mod tests {
     use serde_json::Value;
 
     #[test]
+    #[cfg(feature = "rnd")]
     fn test_hs256_encode_decode() {
-        #[cfg(feature = "rnd")]
         let secret = random_secret();
         let algorithm = HS256::new(&secret);
 

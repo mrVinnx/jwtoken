@@ -2,25 +2,24 @@
 name = "jwtoken"
 version = "0.1.0"
 edition = "2024"
-description = "A simple Rust utility library for encoding and decoding JSON Web Tokens (JWT) with HMAC-SHA256 support."
+description = "A flexible utility library for encoding and decoding JSON Web Tokens (JWT)."
 authors = ["vinicius@mrvnx.me"]
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = "https://github.com/mrVinnx/jwtoken"
 documentation = "https://docs.rs/jwtoken"
 keywords = ["jwt", "token", "authentication", "security"]
 categories = ["authentication", "web-programming"]
 
 [features]
-default = []
 rnd = ["rand"]
 
 [dependencies]
 base64 = "0.22"
-hmac = "0.12"
+hmac = { version = "0.12" }
 rand = { version = "0.9", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sha2 = "0.10"
+sha2 = { version = "0.10" }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full"] }

@@ -21,7 +21,6 @@ pub enum JwtError {
 }
 
 impl fmt::Display for JwtError {
-    /// Formats the error for display.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             JwtError::InvalidFormat => write!(f, "Invalid JWT format"),
@@ -35,17 +34,13 @@ impl fmt::Display for JwtError {
 
 impl std::error::Error for JwtError {}
 
-/// Converts a `String` into a `JwtError::Custom`.
-
 impl From<String> for JwtError {
-    /// Converts a `String` into a `JwtError::Custom`.
     fn from(err: String) -> Self {
         JwtError::Custom(err)
     }
 }
 
 impl From<&'static str> for JwtError {
-    /// Converts a static string slice into a `JwtError::Custom`.
     fn from(err: &'static str) -> Self {
         JwtError::Custom(err.to_string())
     }

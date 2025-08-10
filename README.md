@@ -118,21 +118,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
     #[derive(Serialize, Deserialize)]
-    struct MyClaims {
-        sub: String,
-        name: String,
-        role: String,
-    }
+struct MyClaims {
+    sub: String,
+    name: String,
+    role: String,
+}
 
-    let claims = MyClaims {
-        sub: "user123".to_string(),
-        name: "John Doe".to_string(),
-        role: "admin".to_string(),
-    };
+let claims = MyClaims {
+    sub: "user123".to_string(),
+    name: "John Doe".to_string(),
+    role: "admin".to_string(),
+};
 
-    let jwt = Jwt::<Encoder, MyClaims>::with_claims(claims)
-        .header("kid", "key-id-123")                        // Add custom header
-        .encode(&algorithm)?;                               // Sign and encode to string
+let jwt = Jwt::<Encoder, MyClaims>::with_claims(claims)
+    .header("kid", "key-id-123")                        // Add custom header
+    .encode(&algorithm)?;                               // Sign and encode to string
 ```
 
 ### JWT Decoder

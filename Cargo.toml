@@ -1,6 +1,6 @@
 [package]
 name = "jwtoken"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A flexible utility library for encoding and decoding JSON Web Tokens (JWT)."
 authors = ["vinicius@mrvnx.me"]
@@ -10,17 +10,32 @@ documentation = "https://docs.rs/jwtoken"
 keywords = ["jwt", "token", "authentication", "security"]
 categories = ["authentication", "web-programming"]
 
-[features]
-rnd = ["rand"]
-
 [dependencies]
+# Core dependencies
 base64 = "0.22"
-hmac = { version = "0.12" }
-rand = { version = "0.9", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sha2 = { version = "0.10" }
+
+# --- Optional Dependencies for Features ---
+hmac = { version = "0.12.1", optional = true }
+rand = { version = "0.9.2", optional = true }
+rand_core = { version = "0.9.0", optional = true }
+rsa = { version = "0.9.8", features = ["pem"], optional = true }
+sha2 = { version = "0.10.9", features = ["oid"], optional = true }
+
+[features]
+default = []
+
+# Algorithm features
+hs256 = ["dep:hmac", "dep:sha2"]
+rs256 = ["dep:rsa", "dep:rand_core", "dep:sha2"]
+
+# Utility feature for generating keys and secrets.
+key-gen = ["dep:rand"]
+
+# A convenience feature to enable everything.
+full = ["hs256", "rs256", "key-gen"]
+
 
 [dev-dependencies]
-tokio = { version = "1.0", features = ["full"] }
-jwtoken = { path = ".", features = ["rnd"] }
+jwtoken = { path = ".", features = ["full"] }

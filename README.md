@@ -1,6 +1,6 @@
 # jwtoken
 
-A simple Rust utility library for encoding and decoding JSON Web Tokens (JWT).
+A flexible utility library for encoding and decoding JSON Web Tokens (JWT).
 
 ## Installation
 
@@ -8,11 +8,20 @@ Add `jwtoken` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-# Only HS256 (default)
+# Basic usage
 jwtoken = "0.1.0"
 
-# With random secret generation
-jwtoken = { version = "0.1.0", features = ["rnd"] }
+# With key generation utilities (for random secrets, RSA keypairs)
+jwtoken = { version = "0.1.0", features = ["key-gen"] }
+
+# Enable HS256 algorithm
+jwtoken = { version = "0.1.0", features = ["hs256"] }
+
+# Enable RS256 algorithm
+jwtoken = { version = "0.1.0", features = ["rs256"] }
+
+# Enable all features
+jwtoken = { version = "0.1.0", features = ["full"] }
 ```
 
 ## Usage
@@ -25,8 +34,9 @@ HS256 uses a shared secret key for both signing and verification:
 use jwtoken::{random_secret, Jwt, Encoder, Decoded, HS256};
 
 fn main() -> Result<(), jwtoken::JwtError> {
+    // Requires the "key-gen" feature
     let secret = random_secret();
-    let algorithm = HS256::new(secret);
+    let algorithm = HS256::new(&secret);
 
     // Encoding a JWT
     let token = Jwt::<Encoder>::new()
@@ -45,14 +55,51 @@ fn main() -> Result<(), jwtoken::JwtError> {
 }
 ```
 
+### RS256 (RSA-SHA256)
+
+RS256 uses an RSA key pair, with the private key for signing and the public key for verification:
+
+```rust
+use jwtoken::{rsa_keypair, RS256Signer, RS256Verifier, Jwt, Encoder, Decoded};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Requires the "key-gen" and "rs256" features
+    let (private_key, public_key) = rsa_keypair()?;
+
+    // Create a signer with the private key
+    let signer = RS256Signer::new(private_key);
+    // Create a verifier with the public key
+    let verifier = RS256Verifier::new(public_key);
+
+    // Encoding a JWT
+    let token = Jwt::<Encoder>::new()
+        .claim("sub", "user-id-42")
+        .claim("name", "Jane Doe")
+        .claim("admin", true)
+        .encode(&signer)?;
+
+    println!("Generated RS256 token: {}", token);
+
+    // Decoding and verifying the same JWT with the public key
+    let decoded = Jwt::<Decoded>::decode(&token, &verifier)?;
+    println!("Decoded RS256 claims: {:?}", decoded.claims);
+
+    // The signer also implements Verifier, so it can be used for verification too
+    let decoded_with_signer = Jwt::<Decoded>::decode(&token, &signer)?;
+    assert_eq!(decoded.claims, decoded_with_signer.claims);
+
+    Ok(())
+}
+```
+
 ## API Reference
 
 ### JWT Encoder
 
 ```rust
 let jwt = Jwt::<Encoder>::new()
-    .claim("key", "value")                              // Add a plain values
-    .claim_json("metadata", json!({ "role": "admin" })  // Add a JSON value
+    .claim("key", "value")                              // Add a plain value
+    .claim_json("metadata", serde_json::json!({ "role": "admin" }))  // Add a JSON value
     .encode(&algorithm)?;                               // Sign and encode to string
 ```
 
@@ -73,7 +120,22 @@ let algorithm = decoded.header("alg");
 
 #### HS256 (HMAC-SHA256)
 ```rust
+use jwtoken::HS256;
 let algorithm = HS256::new(secret_bytes);
+```
+
+#### RS256 (RSA-SHA256)
+```rust
+use jwtoken::{rsa_keypair, RS256Signer, RS256Verifier};
+
+// Requires the "key-gen" and "rs256" features
+let (private_key, public_key) = rsa_keypair().unwrap();
+
+// For signing
+let signer = RS256Signer::new(private_key);
+
+// For verifying
+let verifier = RS256Verifier::new(public_key);
 ```
 
 ## Error Handling

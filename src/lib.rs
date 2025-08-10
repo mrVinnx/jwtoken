@@ -1,38 +1,74 @@
 //! A flexible utility library for encoding and decoding JSON Web Tokens (JWT).
 //!
-//! This crate provides a type state API for creating, signing, and verifying JWTs with support for HMAC-SHA256 (HS256).
+//! This crate provides a type state API for creating, signing, and verifying JWTs with support for HMAC-SHA256 (HS256) and RSA-SHA256 (RS256).
 //!
 //! # Examples
 //!
 //! ## Using HS256 (HMAC-SHA256)
 //!
 //! ```rust
-//! # #[cfg(feature = "rnd")]
+//! # #[cfg(all(feature = "key-gen", feature = "hs256"))]
 //! # {
 //! use jwtoken::{random_secret, HS256, Jwt, Encoder, Decoded};
 //!
 //! fn main() -> Result<(), jwtoken::JwtError> {
-//!     let secret = random_secret();
-//!     let algorithm = HS256::new(&secret);
+//!      let secret = random_secret();
+//!      let algorithm = HS256::new(&secret);
+//!
+//!      // Encoding a JWT
+//!      let token = Jwt::<Encoder>::new()
+//!          .claim("sub", "1234567890")
+//!          .claim("name", "John Doe")
+//!          .claim("iat", 1516239022)
+//!          .encode(&algorithm)?;
+//!
+//!      println!("Generated token: {}", token);
+//!
+//!      // Decoding and verifying the same JWT
+//!      let decoded = Jwt::<Decoded>::decode(&token, &algorithm)?;
+//!      println!("Decoded claims: {:?}", decoded.claims);
+//!
+//!      Ok(())
+//! }
+//! # }
+//! ```
+//!
+//! ## Using RS256 (RSA-SHA256)
+//!
+//! ```rust
+//! # #[cfg(all(feature = "key-gen", feature = "rs256"))]
+//! # {
+//! use jwtoken::{rsa_keypair, RS256Signer, RS256Verifier, Jwt, Encoder, Decoded};
+//!
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Generate a new RSA key pair
+//!     let (private_key, public_key) = rsa_keypair()?;
+//!
+//!     // Create a signer with the private key and a verifier with the public key
+//!     let signer = RS256Signer::new(private_key);
+//!     let verifier = RS256Verifier::new(public_key);
 //!
 //!     // Encoding a JWT
 //!     let token = Jwt::<Encoder>::new()
-//!         .claim("sub", "1234567890")
-//!         .claim("name", "John Doe")
-//!         .claim("iat", 1516239022)
-//!         .encode(&algorithm)?;
+//!         .claim("sub", "user-id-42")
+//!         .claim("name", "Jane Doe")
+//!         .claim("admin", true)
+//!         .encode(&signer)?;
 //!
-//!     println!("Generated token: {}", token);
+//!     println!("Generated RS256 token: {}", token);
 //!
 //!     // Decoding and verifying the same JWT
-//!     let decoded = Jwt::<Decoded>::decode(&token, &algorithm)?;
-//!     println!("Decoded claims: {:?}", decoded.claims);
+//!     let decoded = Jwt::<Decoded>::decode(&token, &verifier)?;
+//!     println!("Decoded RS256 claims: {:?}", decoded.claims);
+//!
+//!     // You can also verify with the signer itself, as it holds the public key
+//!     let decoded_with_signer = Jwt::<Decoded>::decode(&token, &signer)?;
+//!     assert_eq!(decoded.claims, decoded_with_signer.claims);
 //!
 //!     Ok(())
 //! }
 //! # }
 //! ```
-//!
 
 mod algorithm;
 mod error;
@@ -43,9 +79,6 @@ pub use error::*;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::Serialize;
 use serde_json::{Map, Value};
-
-#[cfg(feature = "rnd")]
-use rand::{RngCore, rng};
 
 /// A encoder state for creating JWTs.
 #[derive(Debug, Clone)]
@@ -168,12 +201,29 @@ impl Jwt<Decoded> {
     }
 }
 
+#[cfg(feature = "key-gen")]
+use rand::RngCore;
+
 /// Generates a random 256-bit secret for JWT signing.
-#[cfg(feature = "rnd")]
+#[cfg(feature = "key-gen")]
 pub fn random_secret() -> Vec<u8> {
+    use rand::rng;
+
     let mut secret = [0u8; 32];
+
     rng().fill_bytes(&mut secret);
     URL_SAFE_NO_PAD.encode(&secret).into_bytes()
+}
+
+/// Generates a new 2048-bit RSA key pair.
+#[cfg(all(feature = "key-gen", feature = "rs256"))]
+pub fn rsa_keypair() -> Result<(rsa::RsaPrivateKey, rsa::RsaPublicKey), rsa::Error> {
+    let mut rng = rsa::rand_core::OsRng;
+
+    let bits = 2048;
+    let private_key = rsa::RsaPrivateKey::new(&mut rng, bits)?;
+    let public_key = private_key.to_public_key();
+    Ok((private_key, public_key))
 }
 
 #[cfg(test)]
@@ -182,7 +232,7 @@ mod tests {
     use serde_json::Value;
 
     #[test]
-    #[cfg(feature = "rnd")]
+    #[cfg(feature = "key-gen")]
     fn test_hs256_encode_decode() {
         let secret = random_secret();
         let algorithm = HS256::new(&secret);
@@ -213,6 +263,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "hs256")]
     fn test_invalid_signature() {
         let secret = b"256-bit-secret";
         let wrong_secret = b"wrong-secret";
@@ -229,5 +280,57 @@ mod tests {
 
         let result = Jwt::<Decoded>::decode(&token, &wrong_algorithm);
         assert!(result.is_err())
+    }
+
+    #[test]
+    #[cfg(all(feature = "key-gen", feature = "rs256"))]
+    fn test_rs256_encode_decode() {
+        let (private_key, public_key) = rsa_keypair().unwrap();
+        let signer = RS256Signer::new(private_key);
+        let verifier = RS256Verifier::new(public_key);
+
+        let jwt = Jwt::<Encoder>::new()
+            .claim("sub", "test-user")
+            .claim("admin", true)
+            .claim_json("roles", serde_json::json!(["editor", "viewer"]));
+
+        let token = jwt.encode(&signer).unwrap();
+        println!("RS256 Token: {}", token);
+
+        // Verify with the separate verifier
+        let decoded = Jwt::<Decoded>::decode(&token, &verifier).unwrap();
+        assert_eq!(
+            decoded.claim("sub"),
+            Some(&Value::String("test-user".to_string()))
+        );
+        assert_eq!(decoded.claim("admin"), Some(&Value::Bool(true)));
+        assert_eq!(
+            decoded.claim("roles"),
+            Some(&serde_json::json!(["editor", "viewer"]))
+        );
+
+        // Also verify with the signer itself, which also implements Verifier
+        let decoded_with_signer = Jwt::<Decoded>::decode(&token, &signer).unwrap();
+        assert_eq!(decoded.claims, decoded_with_signer.claims);
+    }
+
+    #[test]
+    #[cfg(all(feature = "key-gen", feature = "rs256"))]
+    fn test_rs256_invalid_signature() {
+        // Key pair for signing
+        let (private_key_signer, _) = rsa_keypair().unwrap();
+        let signer = RS256Signer::new(private_key_signer);
+
+        // A different key pair for verifying
+        let (_, public_key_verifier) = rsa_keypair().unwrap();
+        let wrong_verifier = RS256Verifier::new(public_key_verifier);
+
+        let jwt = Jwt::<Encoder>::new().claim("sub", "some-user");
+
+        let token = jwt.encode(&signer).unwrap();
+
+        // Attempt to decode with the wrong public key
+        let result = Jwt::<Decoded>::decode(&token, &wrong_verifier);
+        assert!(matches!(result, Err(JwtError::InvalidSignature)));
     }
 }

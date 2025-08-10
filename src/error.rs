@@ -16,6 +16,8 @@ pub enum JwtError {
     SerializationError,
     /// The JWT uses an invalid or unsupported algorithm.
     InvalidAlgorithm,
+    /// Invalid or unsupported cryptographic key.
+    InvalidKey,
     /// A custom error message.
     Custom(String),
 }
@@ -27,6 +29,7 @@ impl fmt::Display for JwtError {
             JwtError::InvalidSignature => write!(f, "Invalid signature"),
             JwtError::SerializationError => write!(f, "JSON serialization error"),
             JwtError::InvalidAlgorithm => write!(f, "Invalid or unsupported algorithm"),
+            JwtError::InvalidKey => write!(f, "Invalid or unsupported cryptographic key"),
             JwtError::Custom(msg) => write!(f, "Custom error: {}", msg),
         }
     }

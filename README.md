@@ -9,19 +9,19 @@ Add `jwtoken` to your `Cargo.toml`:
 ```toml
 [dependencies]
 # Basic usage
-jwtoken = "0.1.1"
+jwtoken = "0.1.2"
 
 # With key generation utilities (for random secrets, RSA keypairs)
-jwtoken = { version = "0.1.1", features = ["key-gen"] }
+jwtoken = { version = "0.1.2", features = ["key-gen"] }
 
 # Enable HS256 algorithm
-jwtoken = { version = "0.1.1", features = ["hs256"] }
+jwtoken = { version = "0.1.2", features = ["hs256"] }
 
 # Enable RS256 algorithm
-jwtoken = { version = "0.1.1", features = ["rs256"] }
+jwtoken = { version = "0.1.2", features = ["rs256"] }
 
 # Enable all features
-jwtoken = { version = "0.1.1", features = ["full"] }
+jwtoken = { version = "0.1.2", features = ["full"] }
 ```
 
 ## Usage

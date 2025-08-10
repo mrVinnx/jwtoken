@@ -9,19 +9,19 @@ Add `jwtoken` to your `Cargo.toml`:
 ```toml
 [dependencies]
 # Basic usage
-jwtoken = "0.1.4"
+jwtoken = "0.1.5"
 
 # With key generation utilities (for random secrets, RSA keypairs)
-jwtoken = { version = "0.1.4", features = ["key-gen"] }
+jwtoken = { version = "0.1.5", features = ["key-gen"] }
 
 # Enable HS256 algorithm
-jwtoken = { version = "0.1.4", features = ["hs256"] }
+jwtoken = { version = "0.1.5", features = ["hs256"] }
 
 # Enable RS256 algorithm
-jwtoken = { version = "0.1.4", features = ["rs256"] }
+jwtoken = { version = "0.1.5", features = ["rs256"] }
 
 # Enable all features
-jwtoken = { version = "0.1.4", features = ["full"] }
+jwtoken = { version = "0.1.5", features = ["full"] }
 ```
 
 ## Usage
@@ -117,7 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### JWT Encoder
 
 ```rust
-    #[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct MyClaims {
     sub: String,
     name: String,
@@ -138,15 +138,15 @@ let jwt = Jwt::<Encoder, MyClaims>::new(claims)
 ### JWT Decoder
 
 ```rust
-    let decoded = Jwt::<Decoded, MyClaims>::decode(&token, &algorithm)?;
+let decoded = Jwt::<Decoded, MyClaims>::decode(&token, &algorithm)?;
 
-    // Access claims directly through the struct
-    let user_id = &decoded.claims().sub;
-    let name = &decoded.claims().name;
+// Access claims directly through the struct
+let user_id = &decoded.claims().sub;
+let name = &decoded.claims().name;
 
-    // Access headers
-    let algorithm = decoded.header("alg");
-    let key_id = decoded.header("kid");
+// Access headers
+let algorithm = decoded.header("alg");
+let key_id = decoded.header("kid");
 ```
 
 ### Algorithms

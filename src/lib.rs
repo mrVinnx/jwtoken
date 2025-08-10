@@ -30,7 +30,7 @@
 //!      };
 //!
 //!      // Encoding a JWT
-//!      let token = Jwt::<Encoder, MyClaims>::with_claims(claims)
+//!      let token = Jwt::<Encoder, MyClaims>::new(claims)
 //!          .encode(&algorithm)?;
 //!
 //!      println!("Generated token: {}", token);
@@ -74,7 +74,7 @@
 //!     };
 //!
 //!     // Encoding a JWT
-//!     let token = Jwt::<Encoder, MyClaims>::with_claims(claims)
+//!     let token = Jwt::<Encoder, MyClaims>::new(claims)
 //!         .encode(&signer)?;
 //!
 //!     println!("Generated RS256 token: {}", token);
@@ -128,7 +128,7 @@ where
     C: Serialize,
 {
     /// Creates a new JWT builder with the provided claims instance.
-    pub fn with_claims(claims: C) -> Self {
+    pub fn new(claims: C) -> Self {
         let mut headers = Map::new();
         headers.insert("typ".to_string(), Value::String("JWT".to_string()));
 
@@ -249,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn test_with_claims() {
+    fn test_new() {
         let claims = TestClaims {
             sub: "user123".to_string(),
             name: "Test User".to_string(),
@@ -257,7 +257,7 @@ mod tests {
             admin: Some(true),
         };
 
-        let jwt = Jwt::with_claims(claims.clone());
+        let jwt = Jwt::new(claims.clone());
         assert_eq!(jwt.claims.sub, "user123");
         assert_eq!(jwt.claims.name, "Test User");
         assert_eq!(jwt.claims.iat, 1234567890);
@@ -273,7 +273,7 @@ mod tests {
             admin: Some(false),
         };
 
-        let mut jwt = Jwt::with_claims(claims);
+        let mut jwt = Jwt::new(claims);
         jwt.claims_mut().admin = Some(true);
         assert_eq!(jwt.claims.admin, Some(true));
     }
@@ -287,7 +287,7 @@ mod tests {
             admin: None,
         };
 
-        let jwt = Jwt::<Encoder, TestClaims>::with_claims(claims).header("custom", "header_value");
+        let jwt = Jwt::<Encoder, TestClaims>::new(claims).header("custom", "header_value");
 
         let decoded_jwt = Jwt::<Decoded, TestClaims> {
             headers: jwt.headers,
@@ -344,7 +344,7 @@ mod tests {
             admin: Some(true),
         };
 
-        let jwt = Jwt::<Encoder, TestClaims>::with_claims(claims.clone());
+        let jwt = Jwt::<Encoder, TestClaims>::new(claims.clone());
         let token = jwt.encode(&algorithm).unwrap();
         println!("Token: {}", token);
 
@@ -367,7 +367,7 @@ mod tests {
             admin: None,
         };
 
-        let jwt = Jwt::<Encoder, TestClaims>::with_claims(claims);
+        let jwt = Jwt::<Encoder, TestClaims>::new(claims);
         let token = jwt.encode(&algorithm).unwrap();
 
         let result = Jwt::<Decoded, TestClaims>::decode(&token, &wrong_algorithm);
@@ -393,7 +393,7 @@ mod tests {
             roles: vec!["editor".to_string(), "viewer".to_string()],
         };
 
-        let jwt = Jwt::<Encoder, RS256Claims>::with_claims(claims.clone());
+        let jwt = Jwt::<Encoder, RS256Claims>::new(claims.clone());
         let token = jwt.encode(&signer).unwrap();
         println!("RS256 Token: {}", token);
 
@@ -423,7 +423,7 @@ mod tests {
         let (_, public_key_verifier) = rsa_keypair().unwrap();
         let wrong_verifier = RS256Verifier::new(public_key_verifier);
 
-        let jwt = Jwt::<Encoder, TestClaims>::with_claims(claims);
+        let jwt = Jwt::<Encoder, TestClaims>::new(claims);
         let token = jwt.encode(&signer).unwrap();
 
         // Attempt to decode with the wrong public key
@@ -462,7 +462,7 @@ mod tests {
         };
 
         // Encode with HS256
-        let jwt = Jwt::<Encoder, TestClaims>::with_claims(claims);
+        let jwt = Jwt::<Encoder, TestClaims>::new(claims);
         let token = jwt.encode(&hs_algorithm).unwrap();
 
         // Try to decode with RS256 - this should fail with InvalidAlgorithm

@@ -53,7 +53,7 @@ fn main() -> Result<(), jwtoken::JwtError> {
     };
 
     // Encoding a JWT
-    let token = Jwt::<Encoder, MyClaims>::with_claims(claims)
+    let token = Jwt::<Encoder, MyClaims>::new(claims)
         .encode(&algorithm)?;
     println!("Generated token: {}", token);
 
@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Encoding a JWT
-    let token = Jwt::<Encoder, MyClaims>::with_claims(claims)
+    let token = Jwt::<Encoder, MyClaims>::new(claims)
         .encode(&signer)?;
     println!("Generated RS256 token: {}", token);
 
@@ -130,7 +130,7 @@ let claims = MyClaims {
     role: "admin".to_string(),
 };
 
-let jwt = Jwt::<Encoder, MyClaims>::with_claims(claims)
+let jwt = Jwt::<Encoder, MyClaims>::new(claims)
     .header("kid", "key-id-123")                        // Add custom header
     .encode(&algorithm)?;                               // Sign and encode to string
 ```

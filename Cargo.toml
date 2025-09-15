@@ -1,6 +1,6 @@
 [package]
 name = "jwtoken"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 description = "A flexible utility library for encoding and decoding JSON Web Tokens (JWT)."
 authors = ["vinicius@mrvnx.me"]

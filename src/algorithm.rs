@@ -23,7 +23,6 @@ pub trait Verifier {
     fn verify(&self, message: &[u8], signature: &[u8]) -> Result<bool, JwtError>;
 }
 
-// HMAC-SHA256 implementation (HS256)
 #[cfg(feature = "hs256")]
 mod hs256 {
     use super::*;

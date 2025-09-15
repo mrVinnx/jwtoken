@@ -9,19 +9,19 @@ Add `jwtoken` to your `Cargo.toml`:
 ```toml
 [dependencies]
 # Basic usage
-jwtoken = "0.1.5"
+jwtoken = "0.1.6"
 
 # With key generation utilities (for random secrets, RSA keypairs)
-jwtoken = { version = "0.1.5", features = ["key-gen"] }
+jwtoken = { version = "0.1.6", features = ["key-gen"] }
 
 # Enable HS256 algorithm
-jwtoken = { version = "0.1.5", features = ["hs256"] }
+jwtoken = { version = "0.1.6", features = ["hs256"] }
 
 # Enable RS256 algorithm
-jwtoken = { version = "0.1.5", features = ["rs256"] }
+jwtoken = { version = "0.1.6", features = ["rs256"] }
 
 # Enable all features
-jwtoken = { version = "0.1.5", features = ["full"] }
+jwtoken = { version = "0.1.6", features = ["full"] }
 ```
 
 ## Usage
@@ -42,7 +42,6 @@ struct MyClaims {
 }
 
 fn main() -> Result<(), jwtoken::JwtError> {
-    // Requires the "key-gen" feature
     let secret = random_secret();
     let algorithm = HS256::new(&secret);
 
@@ -59,7 +58,7 @@ fn main() -> Result<(), jwtoken::JwtError> {
 
     // Decoding and verifying the same JWT
     let decoded = Jwt::<Decoded, MyClaims>::decode(&token, &algorithm)?;
-    println!("Decoded claims: {:?}", decoded.claims());
+    println!("Decoded claims: {:?}", decoded.claims);
 
     Ok(())
 }
@@ -81,7 +80,6 @@ struct MyClaims {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Requires the "key-gen" and "rs256" features
     let (private_key, public_key) = rsa_keypair()?;
 
     // Create a signer with the private key
@@ -102,11 +100,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Decoding and verifying the same JWT with the public key
     let decoded = Jwt::<Decoded, MyClaims>::decode(&token, &verifier)?;
-    println!("Decoded RS256 claims: {:?}", decoded.claims());
+    println!("Decoded RS256 claims: {:?}", decoded.claims);
 
     // The signer also implements Verifier, so it can be used for verification too
     let decoded_with_signer = Jwt::<Decoded, MyClaims>::decode(&token, &signer)?;
-    assert_eq!(decoded.claims(), decoded_with_signer.claims());
+    assert_eq!(decoded.claims, decoded_with_signer.claims);
 
     Ok(())
 }
@@ -124,13 +122,7 @@ struct MyClaims {
     role: String,
 }
 
-let claims = MyClaims {
-    sub: "user123".to_string(),
-    name: "John Doe".to_string(),
-    role: "admin".to_string(),
-};
-
-let jwt = Jwt::<Encoder, MyClaims>::new(claims)
+let jwt = Jwt::<Encoder, MyClaims>::new(claims)         // Create a new JWT instance with claims
     .header("kid", "key-id-123")                        // Add custom header
     .encode(&algorithm)?;                               // Sign and encode to string
 ```
@@ -138,15 +130,18 @@ let jwt = Jwt::<Encoder, MyClaims>::new(claims)
 ### JWT Decoder
 
 ```rust
+// Decode the JWT token with the algorithm
 let decoded = Jwt::<Decoded, MyClaims>::decode(&token, &algorithm)?;
 
 // Access claims directly through the struct
-let user_id = &decoded.claims().sub;
-let name = &decoded.claims().name;
+let user_id = &decoded.claims.sub;
+let name = &decoded.claims.name;
 
-// Access headers
-let algorithm = decoded.header("alg");
-let key_id = decoded.header("kid");
+// Access headers with generic deserialization
+let algorithm: Option<String> = decoded.header("alg");
+let key_id: Option<i32> = decoded.header("kid");
+// (distinguish between missing vs invalid)
+let algorithm_strict: Result<Option<String>, JwtError> = decoded.header_strict("alg");
 ```
 
 ### Algorithms
@@ -162,19 +157,18 @@ let algorithm = HS256::new(&secret);
 ```rust
 use jwtoken::{rsa_keypair, RS256Signer, RS256Verifier};
 
-// Requires the "key-gen" and "rs256" features
 let (private_key, public_key) = rsa_keypair().unwrap();
 
-// For signing
+// For signing and verifying
 let signer = RS256Signer::new(private_key);
 
 // For verifying
 let verifier = RS256Verifier::new(public_key);
 ```
 
-## Error Handling
+### Error Handling
 
-The library uses a custom `JwtError` enum for error handling:
+Use `JwtError` enum for error handling:
 
 ```rust
 use jwtoken::JwtError;

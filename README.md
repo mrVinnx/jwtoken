@@ -12,16 +12,13 @@ Add `jwtoken` to your `Cargo.toml`:
 jwtoken = "0.1.6"
 
 # With key generation utilities (for random secrets, RSA keypairs)
-jwtoken = { version = "0.1.6", features = ["key-gen"] }
+jwtoken = { version = "0.1.6", features = ["keygen"] }
 
 # Enable HS256 algorithm
 jwtoken = { version = "0.1.6", features = ["hs256"] }
 
 # Enable RS256 algorithm
 jwtoken = { version = "0.1.6", features = ["rs256"] }
-
-# Enable all features
-jwtoken = { version = "0.1.6", features = ["full"] }
 ```
 
 ## Usage

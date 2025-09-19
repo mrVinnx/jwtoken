@@ -31,11 +31,8 @@ hs256 = ["dep:hmac", "dep:sha2"]
 rs256 = ["dep:rsa", "dep:rand_core", "dep:sha2"]
 
 # Utility feature for generating keys and secrets.
-key-gen = ["dep:rand"]
-
-# A convenience feature to enable everything.
-full = ["hs256", "rs256", "key-gen"]
+keygen = ["dep:rand"]
 
 
 [dev-dependencies]
-jwtoken = { path = ".", features = ["full"] }
+jwtoken = { path = ".", features = ["keygen", "hs256", "rs256"] }

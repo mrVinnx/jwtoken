@@ -1,8 +1,8 @@
-#[cfg(feature = "key-gen")]
+#[cfg(feature = "keygen")]
 use rand::RngCore;
 
 /// Generates a random 256-bit secret for JWT signing.
-#[cfg(feature = "key-gen")]
+#[cfg(feature = "keygen")]
 pub fn random_secret() -> Vec<u8> {
     use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
     use rand::rng;
@@ -14,7 +14,7 @@ pub fn random_secret() -> Vec<u8> {
 }
 
 /// Generates a new 2048-bit RSA key pair.
-#[cfg(all(feature = "key-gen", feature = "rs256"))]
+#[cfg(all(feature = "keygen", feature = "rs256"))]
 pub fn rsa_keypair() -> Result<(rsa::RsaPrivateKey, rsa::RsaPublicKey), rsa::Error> {
     let mut rng = rsa::rand_core::OsRng;
 

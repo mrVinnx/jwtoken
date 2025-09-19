@@ -7,7 +7,7 @@
 //! ## Using HS256 (HMAC-SHA256)
 //!
 //! ```rust
-//! # #[cfg(all(feature = "key-gen", feature = "hs256"))]
+//! # #[cfg(all(feature = "keygen", feature = "hs256"))]
 //! # {
 //! use jwtoken::{random_secret, HS256, Jwt, Encoder, Decoded};
 //! use serde::{Serialize, Deserialize};
@@ -47,7 +47,7 @@
 //! ## Using RS256 (RSA-SHA256)
 //!
 //! ```rust
-//! # #[cfg(all(feature = "key-gen", feature = "rs256"))]
+//! # #[cfg(all(feature = "keygen", feature = "rs256"))]
 //! # {
 //! use jwtoken::{rsa_keypair, RS256Signer, RS256Verifier, Jwt, Encoder, Decoded};
 //! use serde::{Serialize, Deserialize};
